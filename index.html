@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>APK Bedah — Android Package Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --card: #1c2030;
+    --border: #252a3a;
+    --accent: #00e5ff;
+    --accent2: #7c4dff;
+    --accent3: #ff6d00;
+    --warn: #ff5252;
+    --ok: #69ff47;
+    --text: #e8eaf0;
+    --muted: #636880;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #0d0f14 0%, #12162a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+  }
+  header p { font-size: 11px; color: var(--muted); }
+
+  /* MAIN */
+  main { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+  /* DROP ZONE */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .drop-zone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(0,229,255,0.06) 0%, transparent 70%);
+  }
+  .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.05);
+    transform: scale(1.01);
+  }
+  .drop-zone input { display: none; }
+  .drop-icon { font-size: 48px; margin-bottom: 12px; display: block; }
+  .drop-zone h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .drop-zone p { font-size: 12px; color: var(--muted); }
+  .btn-upload {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 10px 22px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border: none; border-radius: 8px;
+    color: #fff; font-family: var(--sans);
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.2s;
+  }
+  .btn-upload:active { opacity: 0.8; }
+
+  /* PROGRESS */
+  #progress-wrap { display: none; margin-bottom: 20px; }
+  .progress-bar-bg {
+    background: var(--border);
+    border-radius: 99px; height: 6px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    border-radius: 99px;
+    width: 0%; transition: width 0.3s;
+  }
+  .progress-label {
+    font-size: 11px; color: var(--muted);
+    margin-top: 6px; font-family: var(--mono);
+  }
+
+  /* TABS */
+  #result-section { display: none; }
+  .tabs {
+    display: flex; gap: 4px;
+    background: var(--surface);
+    border-radius: 12px; padding: 4px;
+    margin-bottom: 14px; overflow-x: auto;
+  }
+  .tab {
+    flex-shrink: 0;
+    padding: 7px 12px;
+    border-radius: 8px; border: none;
+    background: transparent; color: var(--muted);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    font-family: var(--sans);
+  }
+  .tab.active {
+    background: var(--card);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* CARD */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted); margin-bottom: 12px;
+  }
+
+  /* APP INFO */
+  .app-header-card {
+    background: linear-gradient(135deg, var(--card), #1a1f35);
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px;
+    display: flex; gap: 16px; align-items: center;
+    margin-bottom: 12px;
+  }
+  .app-icon-placeholder {
+    width: 64px; height: 64px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; flex-shrink: 0;
+  }
+  .app-name { font-size: 18px; font-weight: 700; line-height: 1.2; }
+  .app-pkg { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 3px; word-break: break-all; }
+  .app-version { font-size: 12px; color: var(--accent); margin-top: 5px; font-weight: 600; }
+
+  /* KV ROW */
+  .kv-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+  }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .kv-val { font-family: var(--mono); font-size: 11px; color: var(--text); text-align: right; word-break: break-all; }
+
+  /* BADGE */
+  .badge {
+    display: inline-block; padding: 3px 8px;
+    border-radius: 99px; font-size: 10px; font-weight: 700;
+    margin: 2px;
+  }
+  .badge-cyan { background: rgba(0,229,255,0.12); color: var(--accent); }
+  .badge-purple { background: rgba(124,77,255,0.15); color: #b39ddb; }
+  .badge-orange { background: rgba(255,109,0,0.15); color: #ffb74d; }
+  .badge-red { background: rgba(255,82,82,0.15); color: var(--warn); }
+  .badge-green { background: rgba(105,255,71,0.12); color: var(--ok); }
+
+  /* FILE TREE */
+  .file-tree { font-family: var(--mono); font-size: 11px; }
+  .tree-item {
+    padding: 6px 8px; border-radius: 6px;
+    display: flex; align-items: center; gap: 8px;
+    transition: background 0.15s; cursor: default;
+  }
+  .tree-item:hover { background: rgba(255,255,255,0.04); }
+  .tree-icon { flex-shrink: 0; opacity: 0.7; }
+  .tree-name { flex: 1; color: var(--text); }
+  .tree-size { color: var(--muted); font-size: 10px; }
+  .tree-group {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted); padding: 12px 8px 4px;
+  }
+
+  /* PERMISSIONS */
+  .perm-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .perm-item:last-child { border-bottom: none; }
+  .perm-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+  .perm-name { font-family: var(--mono); font-size: 11px; }
+  .perm-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .dot-danger { background: var(--warn); box-shadow: 0 0 6px rgba(255,82,82,0.4); }
+  .dot-warn { background: var(--accent3); box-shadow: 0 0 6px rgba(255,109,0,0.4); }
+  .dot-safe { background: var(--ok); }
+
+  /* MANIFEST */
+  .xml-view {
+    background: var(--surface);
+    border-radius: 10px; padding: 14px;
+    font-family: var(--mono); font-size: 10px;
+    line-height: 1.7; overflow-x: auto;
+    max-height: 500px; overflow-y: auto;
+    border: 1px solid var(--border);
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .xml-tag { color: #80cbc4; }
+  .xml-attr { color: #ce93d8; }
+  .xml-val { color: #a5d6a7; }
+  .xml-comment { color: var(--muted); font-style: italic; }
+
+  /* STRINGS */
+  .str-item {
+    padding: 8px; border-radius: 6px;
+    background: var(--surface);
+    margin-bottom: 6px;
+    font-size: 11px; border: 1px solid var(--border);
+  }
+  .str-key { color: var(--accent); font-family: var(--mono); margin-bottom: 2px; font-size: 10px; }
+  .str-val { color: var(--text); word-break: break-all; }
+
+  /* SECURITY */
+  .sec-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px; border-radius: 10px;
+    background: var(--surface); margin-bottom: 8px;
+    border: 1px solid var(--border);
+  }
+  .sec-icon { font-size: 20px; flex-shrink: 0; }
+  .sec-label { font-size: 12px; font-weight: 600; }
+  .sec-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* SCORE */
+  .score-ring {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    font-weight: 700;
+    margin: 0 auto 16px;
+    border: 3px solid;
+  }
+  .score-ring .num { font-size: 24px; font-family: var(--mono); }
+  .score-ring .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* SEARCH */
+  .search-box {
+    width: 100%; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--sans); font-size: 13px;
+    padding: 9px 12px; margin-bottom: 10px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .search-box:focus { border-color: var(--accent); }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 18px; border-radius: 99px;
+    font-size: 12px; z-index: 999;
+    transition: opacity 0.3s; opacity: 0; pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; text-align: center;
+  }
+  .stat-num { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+  .stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cyan { color: var(--accent); }
+  .purple { color: #b39ddb; }
+  .orange { color: #ffb74d; }
+  .red { color: var(--warn); }
+  .green { color: var(--ok); }
+
+  /* ── MODAL FILE VIEWER ── */
+  #fileModal {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+    flex-direction: column;
+  }
+  #fileModal.open { display: flex; }
+  .modal-header {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  .modal-title {
+    flex: 1; font-family: var(--mono); font-size: 12px;
+    color: var(--accent); word-break: break-all;
+  }
+  .modal-close {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .modal-body {
+    flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px;
+  }
+  .modal-tabs {
+    display: flex; gap: 4px; margin-bottom: 12px;
+    background: var(--surface); border-radius: 10px; padding: 4px;
+  }
+  .modal-tab {
+    flex: 1; padding: 6px; border-radius: 7px; border: none;
+    background: transparent; color: var(--muted);
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    font-family: var(--sans); transition: all 0.2s;
+  }
+  .modal-tab.active { background: var(--card); color: var(--accent); }
+  .code-view {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+    font-family: var(--mono); font-size: 10px; line-height: 1.8;
+    white-space: pre-wrap; word-break: break-all;
+    max-height: 70vh; overflow-y: auto;
+  }
+  .modal-img { max-width: 100%; border-radius: 10px; display: block; margin: 0 auto; }
+  .hex-view {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+    font-family: var(--mono); font-size: 9px; line-height: 1.8;
+    white-space: pre; overflow-x: auto; max-height: 70vh; overflow-y: auto;
+  }
+  .tree-item { cursor: pointer; }
+  .tree-item:active { background: rgba(0,229,255,0.08); }
+  .dex-class {
+    padding: 8px 10px; border-radius: 7px;
+    background: var(--surface); margin-bottom: 5px;
+    border: 1px solid var(--border); font-family: var(--mono); font-size: 10px;
+  }
+  .dex-class-name { color: var(--accent); margin-bottom: 3px; }
+  .dex-method { color: var(--muted); font-size: 9px; padding: 1px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">🔬</div>
+  <div>
+    <h1>APK BEDAH</h1>
+    <p>Android Package Analyzer v1.0</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- DROP ZONE -->
+  <input type="file" id="fileInput" accept="*/*" style="position:fixed;top:-999px;left:-999px;opacity:0;width:1px;height:1px">
+
+  <div class="drop-zone" id="dropZone">
+    <span class="drop-icon">📦</span>
+    <h2>Upload file APK</h2>
+    <p>Tap di sini atau tombol di bawah<br>untuk memilih file .apk</p>
+    <button class="btn-upload" type="button" id="btnUpload">Pilih File APK</button>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="progress-wrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">Memuat...</div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result-section">
+    <!-- App Header -->
+    <div class="app-header-card">
+      <div class="app-icon-placeholder" id="appIconEl">📱</div>
+      <div>
+        <div class="app-name" id="appNameEl">—</div>
+        <div class="app-pkg" id="appPkgEl">—</div>
+        <div class="app-version" id="appVersionEl">—</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('info')">Info</button>
+      <button class="tab" onclick="switchTab('perms')">Izin</button>
+      <button class="tab" onclick="switchTab('files')">File</button>
+      <button class="tab" onclick="switchTab('manifest')">Manifest</button>
+      <button class="tab" onclick="switchTab('strings')">Strings</button>
+      <button class="tab" onclick="switchTab('security')">Keamanan</button>
+    </div>
+
+    <!-- Tab: INFO -->
+    <div class="tab-content active" id="tab-info">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-num cyan" id="statSize">—</div><div class="stat-lbl">Ukuran APK</div></div>
+        <div class="stat-card"><div class="stat-num purple" id="statFiles">—</div><div class="stat-lbl">Total File</div></div>
+        <div class="stat-card"><div class="stat-num orange" id="statPerms">—</div><div class="stat-lbl">Permission</div></div>
+        <div class="stat-card"><div class="stat-num green" id="statComponents">—</div><div class="stat-lbl">Komponen</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Informasi Aplikasi</div>
+        <div id="infoRows"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Komponen Android</div>
+        <div id="componentRows"></div>
+      </div>
+    </div>
+
+    <!-- Tab: PERMISSIONS -->
+    <div class="tab-content" id="tab-perms">
+      <div class="card">
+        <div class="card-title">Izin yang Diminta (<span id="permCount">0</span>)</div>
+        <div id="permList"></div>
+      </div>
+    </div>
+
+    <!-- Tab: FILES -->
+    <div class="tab-content" id="tab-files">
+      <input type="text" class="search-box" placeholder="🔍 Cari file..." id="fileSearch" oninput="filterFiles()">
+      <div class="card">
+        <div class="card-title">Struktur File APK</div>
+        <div class="file-tree" id="fileTree"></div>
+      </div>
+    </div>
+
+    <!-- Tab: MANIFEST -->
+    <div class="tab-content" id="tab-manifest">
+      <div class="card">
+        <div class="card-title">AndroidManifest.xml</div>
+        <div class="xml-view" id="manifestView">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- Tab: STRINGS -->
+    <div class="tab-content" id="tab-strings">
+      <input type="text" class="search-box" placeholder="🔍 Cari string..." id="strSearch" oninput="filterStrings()">
+      <div id="stringsList"></div>
+    </div>
+
+    <!-- Tab: SECURITY -->
+    <div class="tab-content" id="tab-security">
+      <div style="text-align:center; margin-bottom:16px;">
+        <div class="score-ring" id="scoreRing">
+          <span class="num" id="scoreNum">—</span>
+          <span class="lbl">Skor</span>
+        </div>
+      </div>
+      <div id="securityList"></div>
+    </div>
+
+  </div><!-- end result-section -->
+
+
+<!-- FILE VIEWER MODAL -->
+<div id="fileModal">
+  <div class="modal-header">
+    <div class="modal-title" id="modalTitle">file.xml</div>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="modal-tabs" id="modalTabs" style="display:none">
+      <button class="modal-tab active" onclick="switchModalTab('preview')">Preview</button>
+      <button class="modal-tab" onclick="switchModalTab('hex')">Hex</button>
+    </div>
+    <div id="modalPreview"></div>
+    <div id="modalHex" style="display:none"></div>
+  </div>
+</div>
+</main>
+
+<div id="toast"></div>
+
+<script src="jszip.min.js"></script>
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let apkData = { files: [], permissions: [], manifest: '', info: {}, components: {}, strings: {} };
+let allFiles = [];
+let allStrings = [];
+
+// ─── DRAG & DROP ─────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const btnUpload = document.getElementById('btnUpload');
+
+// Tombol & drop-zone buka file picker
+function openFilePicker(e) {
+  e.stopPropagation();
+  fileInput.click();
+}
+btnUpload.addEventListener('click', openFilePicker);
+dropZone.addEventListener('click', openFilePicker);
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) processAPK(f);
+});
+
+// Validasi saat file dipilih — accept="*/*" supaya file manager HP tidak kosong
+fileInput.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (!f.name.toLowerCase().endsWith('.apk')) {
+    toast('⚠️ Pilih file .apk ya!');
+    fileInput.value = '';
+    return;
+  }
+  processAPK(f);
+});
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['info','perms','files','manifest','strings','security'][i] === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ─── PROGRESS ────────────────────────────────────────────────────────────────
+function setProgress(pct, label) {
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+// ─── MAIN PROCESS ────────────────────────────────────────────────────────────
+async function processAPK(file) {
+  if (!file.name.endsWith('.apk')) { toast('⚠️ File harus berformat .apk'); return; }
+  document.getElementById('result-section').style.display = 'none';
+  setProgress(5, 'Membaca file APK...');
+
+  try {
+    const buf = await file.arrayBuffer();
+    setProgress(20, 'Membuka ZIP...');
+    const zip = await JSZip.loadAsync(buf);
+
+    setProgress(35, 'Menganalisis struktur...');
+    const files = [];
+    zip.forEach((path, entry) => {
+      if (!entry.dir) files.push({ path, size: entry._data ? (entry._data.uncompressedSize || 0) : 0, entry });
+    });
+
+    setProgress(50, 'Membaca AndroidManifest...');
+    let manifestRaw = '';
+    const manifestEntry = zip.file('AndroidManifest.xml');
+    if (manifestEntry) {
+      const bytes = await manifestEntry.async('uint8array');
+      manifestRaw = parseAndroidManifest(bytes);
+    }
+
+    setProgress(65, 'Mengekstrak strings...');
+    let stringsObj = {};
+    const strEntry = zip.file('res/values/strings.xml');
+    if (strEntry) {
+      const txt = await strEntry.async('string');
+      stringsObj = parseStringsXml(txt);
+    }
+
+    setProgress(80, 'Menganalisis keamanan...');
+    const info = extractInfo(manifestRaw, file);
+    const permissions = extractPermissions(manifestRaw);
+    const components = extractComponents(manifestRaw);
+
+    setProgress(95, 'Merender hasil...');
+    apkData = { files, permissions, manifest: manifestRaw, info, components, strings: stringsObj };
+    allFiles = files;
+    allStrings = Object.entries(stringsObj);
+
+    renderAll(file);
+    setProgress(100, 'Selesai!');
+    setTimeout(() => { document.getElementById('progress-wrap').style.display = 'none'; }, 600);
+    document.getElementById('result-section').style.display = 'block';
+
+  } catch(e) {
+    setProgress(0, '❌ Gagal: ' + e.message);
+    toast('❌ ' + e.message);
+    console.error(e);
+  }
+}
+
+// ─── PARSE BINARY MANIFEST ───────────────────────────────────────────────────
+function parseAndroidManifest(bytes) {
+  try {
+    const view = new DataView(bytes.buffer);
+    const magic = view.getUint32(0, true);
+    if (magic !== 0x00080003) {
+      // Coba parse sebagai teks biasa
+      const text = new TextDecoder('utf-8', {fatal: false}).decode(bytes);
+      if (text.includes('<?xml')) return text;
+      return '[Binary Manifest - tidak dapat di-decode]\n' + 
+             'Gunakan tools seperti apktool untuk hasil lengkap.\n\n' +
+             'Magic: 0x' + magic.toString(16);
+    }
+
+    // Baca jumlah string dengan safe check
+    const stringCountOffset = 4 * 7;
+    if (bytes.length < stringCountOffset + 4) {
+      return '<!-- Manifest terlalu pendek atau corrupt -->';
+    }
+    const stringCount = view.getUint32(stringCountOffset, true);
+    const strOffset = view.getUint32(4 * 8, true);
+
+    // Parse string pool dengan batasan aman
+    const strings = [];
+    const maxStrings = Math.min(stringCount, 1000);
+    for (let i = 0; i < maxStrings; i++) {
+      const offOffset = 4 * 8 + 4 + i * 4;
+      if (offOffset + 4 > bytes.length) break;
+      const off = strOffset + view.getUint32(offOffset, true);
+      if (off + 2 > bytes.length) break;
+      const len = view.getUint16(off, true);
+      if (off + 2 + len * 2 > bytes.length) break;
+      let s = '';
+      for (let j = 0; j < len && j < 2000; j++) {
+        const c = view.getUint16(off + 2 + j * 2, true);
+        if (c) s += String.fromCharCode(c);
+      }
+      strings.push(s);
+    }
+
+    // Walk chunks dengan safe guard
+    const xmlStart = view.getUint32(4, true) + 8;
+    let pos = xmlStart;
+    let indent = 0;
+    let out = '<?xml version="1.0" encoding="utf-8"?>\n';
+    const total = bytes.length;
+    let maxIter = 50000;
+
+    while (pos < total - 4 && maxIter-- > 0) {
+      const type = view.getUint16(pos, true);
+      if (pos + 4 > total) break;
+      const size = view.getUint32(pos + 4, true);
+      if (!size || size > total || size < 8) break;
+
+      if (type === 0x0102) { // START_ELEMENT
+        const nameIdx = view.getInt32(pos + 12, true);
+        const attrCount = view.getUint16(pos + 20, true);
+        const name = (nameIdx >= 0 && nameIdx < strings.length) ? strings[nameIdx] : '?';
+        let line = '  '.repeat(indent) + '<' + name;
+        
+        const attrStart = pos + 28;
+        const maxAttrs = Math.min(attrCount, 50);
+        for (let a = 0; a < maxAttrs; a++) {
+          const base = attrStart + a * 20;
+          if (base + 20 > total) break;
+          const attrNameIdx = view.getInt32(base + 4, true);
+          const attrValueIdx = view.getInt32(base + 8, true);
+          const valueType = view.getUint8(base + 15);
+          const valueData = view.getInt32(base + 16, true);
+
+          const attrName = (attrNameIdx >= 0 && attrNameIdx < strings.length) ? strings[attrNameIdx] : '?';
+          let attrVal;
+          if (attrValueIdx >= 0 && attrValueIdx < strings.length) {
+            attrVal = strings[attrValueIdx];
+          } else if (valueType === 0x12) {
+            attrVal = valueData ? 'true' : 'false';
+          } else if (valueType === 0x10 || valueType === 0x11) {
+            attrVal = valueData.toString();
+          } else if (valueType === 0x01) {
+            attrVal = '@0x' + valueData.toString(16);
+          } else {
+            attrVal = valueData.toString();
+          }
+          
+          const nsPrefix = attrName.includes('android:') ? '' : 
+                         (attrName.includes(':') ? '' : '');
+          line += '\n' + '  '.repeat(indent + 1) + attrName + '="' + (attrVal || '') + '"';
+        }
+        line += attrCount > 0 ? '\n' + '  '.repeat(indent) + '>' : '>';
+        out += line + '\n';
+        indent++;
+      } else if (type === 0x0103) { // END_ELEMENT
+        indent = Math.max(0, indent - 1);
+        const nameIdx = view.getInt32(pos + 12, true);
+        const name = (nameIdx >= 0 && nameIdx < strings.length) ? strings[nameIdx] : '?';
+        out += '  '.repeat(indent) + '</' + name + '>\n';
+      }
+
+      pos += size;
+    }
+    
+    if (out.includes('<?xml')) return out;
+    return '<!-- Manifest tidak bisa di-decode penuh -->\n' + out;
+
+  } catch(e) {
+    // Fallback: coba baca sebagai teks
+    try {
+      const text = new TextDecoder('utf-8', {fatal: false}).decode(bytes);
+      if (text.includes('<?xml')) return text;
+    } catch(e2) {}
+    return '<!-- Parse error: ' + e.message + ' -->\n' +
+           'File manifest mungkin terenkripsi atau dalam format yang tidak didukung.';
+  }
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function extractInfo(manifest, file) {
+  const get = (attr) => { const m = new RegExp(attr + '="([^"]*)"').exec(manifest); return m ? m[1] : '—'; };
+  return {
+    packageName: get('package') || get('android:name'),
+    versionName: get('android:versionName'),
+    versionCode: get('android:versionCode'),
+    minSdk: get('android:minSdkVersion'),
+    targetSdk: get('android:targetSdkVersion'),
+    label: get('android:label'),
+    icon: get('android:icon'),
+    fileName: file.name,
+    fileSize: formatSize(file.size),
+    fileSizeRaw: file.size,
+    installLocation: get('android:installLocation'),
+    compileSdk: get('android:compileSdkVersion'),
+    networkSecurity: manifest.includes('networkSecurityConfig'),
+    debuggable: get('android:debuggable'),
+    allowBackup: get('android:allowBackup'),
+    cleartext: get('android:usesCleartextTraffic'),
+    supportsRTL: get('android:supportsRtl'),
+  };
+}
+
+function extractPermissions(manifest) {
+  const perms = [];
+  const re = /uses-permission[^>]*android:name="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(manifest))) perms.push(m[1]);
+  return [...new Set(perms)];
+}
+
+function extractComponents(manifest) {
+  const count = (tag) => (manifest.match(new RegExp('<' + tag + '[\\s>]', 'g')) || []).length;
+  const names = (tag) => { const r = new RegExp('<' + tag + '[^>]*android:name="([^"]*)"', 'g'); const a = []; let m; while((m = r.exec(manifest))) a.push(m[1]); return a; };
+  return {
+    activities: names('activity'),
+    services: names('service'),
+    receivers: names('receiver'),
+    providers: names('provider'),
+  };
+}
+
+function parseStringsXml(xml) {
+  const obj = {};
+  const re = /<string name="([^"]*)"[^>]*>([^<]*)<\/string>/g;
+  let m;
+  while ((m = re.exec(xml))) obj[m[1]] = m[2];
+  return obj;
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(2) + ' MB';
+}
+
+function fileIcon(path) {
+  if (path.endsWith('.dex')) return '⚙️';
+  if (path.endsWith('.xml')) return '📄';
+  if (path.match(/\.(png|jpg|jpeg|gif|webp)$/)) return '🖼️';
+  if (path.endsWith('.arsc')) return '📦';
+  if (path.endsWith('.so')) return '🔧';
+  if (path.endsWith('.json')) return '📋';
+  if (path.match(/\.(ttf|otf)$/)) return '🔤';
+  if (path.startsWith('META-INF/')) return '🔐';
+  if (path.startsWith('lib/')) return '📚';
+  if (path.startsWith('assets/')) return '🗂️';
+  if (path.startsWith('res/')) return '🎨';
+  return '📄';
+}
+
+const DANGER_PERMS = ['READ_CONTACTS','WRITE_CONTACTS','READ_SMS','SEND_SMS','RECEIVE_SMS','READ_CALL_LOG','WRITE_CALL_LOG','RECORD_AUDIO','CAMERA','ACCESS_FINE_LOCATION','ACCESS_BACKGROUND_LOCATION','READ_PHONE_STATE','CALL_PHONE','PROCESS_OUTGOING_CALLS','GET_ACCOUNTS','READ_EXTERNAL_STORAGE','WRITE_EXTERNAL_STORAGE','MANAGE_EXTERNAL_STORAGE','RECEIVE_MMS','READ_MEDIA_IMAGES','BIND_DEVICE_ADMIN','SYSTEM_ALERT_WINDOW','FOREGROUND_SERVICE','REQUEST_INSTALL_PACKAGES'];
+const WARN_PERMS = ['INTERNET','BLUETOOTH','NFC','VIBRATE','RECEIVE_BOOT_COMPLETED','USE_BIOMETRIC','USE_FINGERPRINT','CHANGE_NETWORK_STATE','ACCESS_WIFI_STATE','ACCESS_NETWORK_STATE','CHANGE_WIFI_STATE'];
+
+function permLevel(perm) {
+  const short = perm.replace('android.permission.', '');
+  if (DANGER_PERMS.includes(short)) return 'danger';
+  if (WARN_PERMS.includes(short)) return 'warn';
+  return 'safe';
+}
+
+function permDesc(perm) {
+  const short = perm.replace('android.permission.', '');
+  const map = {
+    CAMERA: 'Akses kamera perangkat',
+    RECORD_AUDIO: 'Rekam audio dari mikrofon',
+    ACCESS_FINE_LOCATION: 'Lokasi GPS presisi tinggi',
+    ACCESS_BACKGROUND_LOCATION: 'Lokasi saat app di background',
+    READ_CONTACTS: 'Baca daftar kontak',
+    WRITE_CONTACTS: 'Tulis/edit kontak',
+    READ_SMS: 'Baca pesan SMS',
+    SEND_SMS: 'Kirim SMS',
+    RECEIVE_SMS: 'Terima SMS masuk',
+    READ_CALL_LOG: 'Baca riwayat telepon',
+    READ_EXTERNAL_STORAGE: 'Baca file di storage',
+    WRITE_EXTERNAL_STORAGE: 'Tulis file ke storage',
+    MANAGE_EXTERNAL_STORAGE: 'Kelola semua file (akses penuh)',
+    INTERNET: 'Akses koneksi internet',
+    BLUETOOTH: 'Koneksi Bluetooth',
+    NFC: 'Komunikasi NFC',
+    VIBRATE: 'Kontrol vibrasi',
+    RECEIVE_BOOT_COMPLETED: 'Jalankan saat hp menyala',
+    USE_BIOMETRIC: 'Gunakan sidik jari/wajah',
+    SYSTEM_ALERT_WINDOW: 'Tampil di atas app lain',
+    REQUEST_INSTALL_PACKAGES: 'Install APK lain',
+    FOREGROUND_SERVICE: 'Layanan latar depan',
+    READ_PHONE_STATE: 'Baca info SIM & telepon',
+    CALL_PHONE: 'Buat panggilan telepon',
+    GET_ACCOUNTS: 'Akses akun Google/email',
+    ACCESS_WIFI_STATE: 'Status koneksi WiFi',
+    ACCESS_NETWORK_STATE: 'Status jaringan internet',
+    BIND_DEVICE_ADMIN: 'Hak administrator perangkat',
+    CHANGE_NETWORK_STATE: 'Ubah pengaturan jaringan',
+    USE_FINGERPRINT: 'Gunakan sensor sidik jari',
+  };
+  return map[short] || perm.replace('android.permission.', '').replace(/_/g, ' ').toLowerCase();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderAll(file) {
+  const { files, permissions, manifest, info, components, strings } = apkData;
+
+  // App header
+  document.getElementById('appNameEl').textContent = info.label !== '—' ? info.label : (file.name.replace('.apk',''));
+  document.getElementById('appPkgEl').textContent = info.packageName;
+  document.getElementById('appVersionEl').textContent = 'v' + info.versionName + ' (kode: ' + info.versionCode + ')';
+
+  // Stats
+  document.getElementById('statSize').textContent = info.fileSize;
+  document.getElementById('statFiles').textContent = files.length;
+  document.getElementById('statPerms').textContent = permissions.length;
+  const compTotal = (components.activities||[]).length + (components.services||[]).length + (components.receivers||[]).length + (components.providers||[]).length;
+  document.getElementById('statComponents').textContent = compTotal;
+
+  // Info tab
+  const rows = [
+    ['Nama Paket', info.packageName],
+    ['Versi', info.versionName + ' (' + info.versionCode + ')'],
+    ['Min SDK', info.minSdk + (info.minSdk !== '—' ? ' (Android ' + sdkToAndroid(info.minSdk) + ')' : '')],
+    ['Target SDK', info.targetSdk + (info.targetSdk !== '—' ? ' (Android ' + sdkToAndroid(info.targetSdk) + ')' : '')],
+    ['Compile SDK', info.compileSdk],
+    ['Install Location', info.installLocation],
+    ['Debuggable', info.debuggable],
+    ['Allow Backup', info.allowBackup],
+    ['Cleartext HTTP', info.cleartext],
+    ['Network Security Config', info.networkSecurity ? 'Ya' : 'Tidak'],
+    ['Nama File', info.fileName],
+    ['Ukuran File', info.fileSize],
+  ];
+  document.getElementById('infoRows').innerHTML = rows.map(([k,v]) =>
+    `<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val">${v}</span></div>`
+  ).join('');
+
+  // Components
+  const comps = [
+    ['Activity', components.activities, '🟢'],
+    ['Service', components.services, '🔵'],
+    ['BroadcastReceiver', components.receivers, '🟡'],
+    ['ContentProvider', components.providers, '🟣'],
+  ];
+  document.getElementById('componentRows').innerHTML = comps.map(([name, list, emoji]) =>
+    list.length ? `<div class="kv-row"><span class="kv-key">${emoji} ${name}</span><span class="kv-val">${list.length} komponen</span></div>
+    <div style="padding:4px 8px 8px;font-family:var(--mono);font-size:10px;color:var(--muted);">${list.map(n => '<div>• ' + n + '</div>').join('')}</div>` : ''
+  ).join('');
+
+  // Permissions
+  document.getElementById('permCount').textContent = permissions.length;
+  document.getElementById('permList').innerHTML = permissions.length === 0
+    ? '<div style="color:var(--muted);font-size:12px;padding:8px 0">Tidak ada permission ditemukan</div>'
+    : permissions.map(p => {
+        const lvl = permLevel(p);
+        return `<div class="perm-item">
+          <div class="perm-dot dot-${lvl}"></div>
+          <div><div class="perm-name">${p}</div><div class="perm-desc">${permDesc(p)}</div></div>
+        </div>`;
+      }).join('');
+
+  // Files
+  renderFileTree(files);
+
+  // Manifest
+  renderManifest(manifest);
+
+  // Strings
+  renderStrings(strings);
+
+  // Security
+  renderSecurity(info, permissions, manifest);
+}
+
+function sdkToAndroid(sdk) {
+  const m = { '34':'14','33':'13','32':'12L','31':'12','30':'11','29':'10','28':'9','27':'8.1','26':'8.0','25':'7.1','24':'7.0','23':'6.0','22':'5.1','21':'5.0' };
+  return m[sdk] || '?';
+}
+
+function renderFileTree(files) {
+  const groups = {};
+  files.forEach(f => {
+    const top = f.path.includes('/') ? f.path.split('/')[0] : 'Root';
+    if (!groups[top]) groups[top] = [];
+    groups[top].push(f);
+  });
+  let html = '';
+  Object.entries(groups).forEach(([group, items]) => {
+    html += `<div class="tree-group">${group}/ (${items.length})</div>`;
+    items.slice(0,50).forEach(f => {
+      html += `<div class="tree-item" data-path="${f.path.toLowerCase()}" onclick="openFile('${f.path.replace(/'/g,"\\'")}')">
+        <span class="tree-icon">${fileIcon(f.path)}</span>
+        <span class="tree-name">${f.path}</span>
+        <span class="tree-size">${formatSize(f.size)} <span style="color:var(--accent);font-size:9px">▶</span></span>
+      </div>`;
+    });
+    if (items.length > 50) html += `<div style="font-size:10px;color:var(--muted);padding:4px 8px">...dan ${items.length - 50} file lainnya</div>`;
+  });
+  document.getElementById('fileTree').innerHTML = html;
+}
+
+// ─── FILE VIEWER ─────────────────────────────────────────────────────────────
+let currentFileBytes = null;
+
+async function openFile(path) {
+  const fileObj = apkData.files.find(f => f.path === path);
+  if (!fileObj) return;
+
+  document.getElementById('modalTitle').textContent = path;
+  document.getElementById('fileModal').classList.add('open');
+  document.getElementById('modalPreview').innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;font-size:12px">⏳ Memuat...</div>';
+  document.getElementById('modalHex').style.display = 'none';
+  document.getElementById('modalTabs').style.display = 'none';
+
+  try {
+    const bytes = await fileObj.entry.async('uint8array');
+    currentFileBytes = bytes;
+    const ext = path.split('.').pop().toLowerCase();
+
+    // ─── GAMBAR / IMAGE ──────────────────────────────────────────────
+    if (['png','jpg','jpeg','gif','webp','bmp','ico','svg'].includes(ext)) {
+      renderImage(bytes, ext, path);
+    } 
+    // ─── XML ──────────────────────────────────────────────────────────
+    else if (ext === 'xml') {
+      const text = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+      if (text.charCodeAt(0) === 0 || bytes[0] === 0x03) {
+        const parsed = parseAndroidManifest(bytes);
+        renderCode(parsed, 'xml');
+      } else {
+        renderCode(text, 'xml');
+      }
+      showHexTab(bytes);
+    } 
+    // ─── DEX ──────────────────────────────────────────────────────────
+    else if (['dex'].includes(ext)) {
+      renderDex(bytes, path);
+      showHexTab(bytes);
+    } 
+    // ─── TEXT / CODE ──────────────────────────────────────────────────
+    else if (['js','json','html','css','txt','md','mf','sf','properties','gradle','kt','java'].includes(ext) || path.includes('META-INF/')) {
+      const text = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+      renderCode(text, ext);
+      showHexTab(bytes);
+    } 
+    // ─── RESOURCES ────────────────────────────────────────────────────
+    else if (ext === 'arsc') {
+      renderArsc(bytes);
+      showHexTab(bytes);
+    } 
+    // ─── FONT ─────────────────────────────────────────────────────────
+    else if (['ttf','otf','woff','woff2'].includes(ext)) {
+      renderFont(bytes, path);
+    } 
+    // ─── MEDIA ────────────────────────────────────────────────────────
+    else if (['mp4','mp3','ogg','wav','webm','avi'].includes(ext)) {
+      renderMedia(bytes, ext, path);
+    } 
+    // ─── COMPRESSED ──────────────────────────────────────────────────
+    else if (ext === 'gz' || ext === 'zip') {
+      document.getElementById('modalPreview').innerHTML = `
+        <div class="dex-class" style="text-align:center;padding:20px">
+          <div style="font-size:32px;margin-bottom:10px">🗜️</div>
+          <div style="color:var(--text);margin-bottom:5px">File terkompresi (.${ext})</div>
+          <div style="color:var(--muted);font-size:11px">Ukuran: ${formatSize(bytes.length)}</div>
+        </div>`;
+      showHexTab(bytes);
+    } 
+    // ─── BINARY / UNKNOWN ────────────────────────────────────────────
+    else {
+      // Coba baca sebagai teks
+      const text = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+      const isPrintable = text.split('').filter(c => c.charCodeAt(0) < 32 && c !== '\n' && c !== '\r' && c !== '\t').length < text.length * 0.1;
+      if (isPrintable && text.length > 0 && text.length < 500000) {
+        renderCode(text, 'txt');
+        showHexTab(bytes);
+      } else {
+        document.getElementById('modalPreview').innerHTML = `
+          <div class="dex-class" style="text-align:center;padding:20px">
+            <div style="font-size:32px;margin-bottom:10px">📦</div>
+            <div style="color:var(--text);margin-bottom:5px">File Binary</div>
+            <div style="color:var(--muted);font-size:11px">Ukuran: ${formatSize(bytes.length)}</div>
+            <div style="color:var(--muted);font-size:10px;margin-top:8px">Ekstensi: .${ext}</div>
+          </div>`;
+        showHexTab(bytes);
+      }
+    }
+  } catch(e) {
+    document.getElementById('modalPreview').innerHTML = `<div style="color:var(--warn);padding:16px;font-size:12px">❌ Gagal buka: ${e.message}</div>`;
+  }
+}
+
+function closeModal() {
+  document.getElementById('fileModal').classList.remove('open');
+  currentFileBytes = null;
+}
+
+function showHexTab(bytes) {
+  document.getElementById('modalTabs').style.display = 'flex';
+  renderHex(bytes);
+}
+
+function switchModalTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach((t,i) => t.classList.toggle('active', ['preview','hex'][i] === tab));
+  document.getElementById('modalPreview').style.display = tab === 'preview' ? '' : 'none';
+  document.getElementById('modalHex').style.display = tab === 'hex' ? '' : 'none';
+}
+
+// ─── RENDER IMAGE ────────────────────────────────────────────────────────────
+function renderImage(bytes, ext, path) {
+  try {
+    const mimeTypes = {
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'bmp': 'image/bmp',
+      'ico': 'image/x-icon',
+      'svg': 'image/svg+xml'
+    };
+    
+    const mime = mimeTypes[ext] || 'image/' + ext;
+    const blob = new Blob([bytes], {type: mime});
+    const url = URL.createObjectURL(blob);
+    
+    const img = new Image();
+    img.onload = function() {
+      document.getElementById('modalPreview').innerHTML = `
+        <div style="text-align:center;padding:10px">
+          <img src="${url}" class="modal-img" style="max-width:100%;max-height:70vh;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;max-width:400px;margin-left:auto;margin-right:auto">
+            <div style="background:var(--surface);padding:8px;border-radius:8px;border:1px solid var(--border)">
+              <div style="font-size:10px;color:var(--muted)">Dimensi</div>
+              <div style="font-size:12px;color:var(--text);font-family:var(--mono)">${this.width} × ${this.height}</div>
+            </div>
+            <div style="background:var(--surface);padding:8px;border-radius:8px;border:1px solid var(--border)">
+              <div style="font-size:10px;color:var(--muted)">Ukuran</div>
+              <div style="font-size:12px;color:var(--text);font-family:var(--mono)">${formatSize(bytes.length)}</div>
+            </div>
+          </div>
+          <div style="color:var(--muted);font-size:10px;margin-top:8px">${path}</div>
+        </div>`;
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = function() {
+      try {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('modalPreview').innerHTML = `
+            <div style="text-align:center;padding:10px">
+              <img src="${e.target.result}" class="modal-img" style="max-width:100%;max-height:70vh;border-radius:10px">
+              <div style="color:var(--muted);font-size:10px;margin-top:8px">${formatSize(bytes.length)} · ${path}</div>
+            </div>`;
+        };
+        reader.readAsDataURL(blob);
+      } catch(e2) {
+        document.getElementById('modalPreview').innerHTML = `
+          <div style="text-align:center;padding:20px;color:var(--warn)">
+            <div style="font-size:32px;margin-bottom:10px">🖼️</div>
+            <div>Gagal menampilkan gambar</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">${formatSize(bytes.length)} · ${path}</div>
+          </div>`;
+      }
+    };
+    img.src = url;
+    
+  } catch(e) {
+    document.getElementById('modalPreview').innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--warn)">
+        <div style="font-size:32px;margin-bottom:10px">❌</div>
+        <div>Gagal memuat gambar: ${e.message}</div>
+      </div>`;
+  }
+}
+
+// ─── RENDER CODE ─────────────────────────────────────────────────────────────
+function renderCode(text, lang) {
+  let colored = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if (lang === 'xml') {
+    colored = colored
+      .replace(/(&lt;\/?(\w[\w:.]*)[^&]*?&gt;)/g, '<span style="color:#80cbc4">$1</span>')
+      .replace(/(\w+:\w+)=/g, '<span style="color:#ce93d8">$1</span>=')
+      .replace(/"([^"]*)"/g, '"<span style="color:#a5d6a7">$1</span>"');
+  } else if (lang === 'json') {
+    colored = colored
+      .replace(/"(\w+)":/g, '<span style="color:#ce93d8">"$1"</span>:')
+      .replace(/: "([^"]*)"/g, ': "<span style="color:#a5d6a7">$1</span>"')
+      .replace(/: (\d+)/g, ': <span style="color:#80cbc4">$1</span>');
+  } else if (lang === 'js' || lang === 'java' || lang === 'kt') {
+    colored = colored
+      .replace(/\b(function|var|let|const|return|if|else|for|while|class|import|export|new|this|package|public|private|protected|static|final|override|suspend)\b/g, '<span style="color:#ce93d8">$1</span>')
+      .replace(/\/\/.*/g, '<span style="color:#636880;font-style:italic">$&</span>');
+  }
+  document.getElementById('modalPreview').innerHTML = `<div class="code-view">${colored}</div>`;
+}
+
+// ─── RENDER MEDIA ────────────────────────────────────────────────────────────
+function renderMedia(bytes, ext, path) {
+  const mime = ext === 'mp4' ? 'video/mp4' : ext === 'mp3' ? 'audio/mpeg' : 'audio/' + ext;
+  const isVideo = ['mp4','webm','avi'].includes(ext);
+  const blob = new Blob([bytes], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const tag = isVideo
+    ? `<video controls style="width:100%;border-radius:10px;max-height:300px"><source src="${url}" type="${mime}"></video>`
+    : `<audio controls style="width:100%;margin-top:20px"><source src="${url}" type="${mime}"></audio>`;
+  document.getElementById('modalPreview').innerHTML = `
+    <div style="text-align:center;padding:10px">
+      ${tag}
+      <div style="color:var(--muted);font-size:10px;margin-top:8px">${path} · ${formatSize(bytes.length)}</div>
+    </div>`;
+}
+
+// ─── RENDER FONT ─────────────────────────────────────────────────────────────
+function renderFont(bytes, path) {
+  const blob = new Blob([bytes], {type:'font/ttf'});
+  const url = URL.createObjectURL(blob);
+  const fontName = 'previewFont_' + Date.now();
+  const style = document.createElement('style');
+  style.textContent = `@font-face { font-family: '${fontName}'; src: url('${url}'); }`;
+  document.head.appendChild(style);
+  document.getElementById('modalPreview').innerHTML = `
+    <div class="dex-class" style="text-align:center;padding:20px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">🔤 Preview Font</div>
+      <div style="font-family:'${fontName}';font-size:28px;color:var(--text);margin-bottom:8px">AaBbCcDd</div>
+      <div style="font-family:'${fontName}';font-size:16px;color:var(--muted);margin-bottom:8px">0123456789 !@#$%</div>
+      <div style="font-family:'${fontName}';font-size:13px;color:var(--muted)">The quick brown fox jumps over the lazy dog</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:12px">${path} · ${formatSize(bytes.length)}</div>
+    </div>`;
+}
+
+// ─── RENDER ARSC ─────────────────────────────────────────────────────────────
+function renderArsc(bytes) {
+  document.getElementById('modalPreview').innerHTML = `
+    <div class="dex-class" style="text-align:center;padding:20px">
+      <div style="font-size:32px;margin-bottom:10px">📦</div>
+      <div style="color:var(--text);font-size:13px;margin-bottom:5px">resources.arsc</div>
+      <div style="color:var(--muted);font-size:11px">File resource binary Android</div>
+      <div style="color:var(--muted);font-size:11px;margin-top:4px">Ukuran: ${formatSize(bytes.length)}</div>
+      <div style="color:var(--muted);font-size:10px;margin-top:12px">Parse penuh membutuhkan native tool (aapt2)</div>
+    </div>`;
+}
+
+// ─── RENDER DEX ──────────────────────────────────────────────────────────────
+function renderDex(bytes, path) {
+  const view = new DataView(bytes.buffer);
+  const magic = String.fromCharCode(...bytes.slice(0,8));
+  const stringsSize = view.getUint32(56, true);
+  const classesSize = view.getUint32(96, true);
+  const methodsSize = view.getUint32(88, true);
+
+  const text = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+  const classNames = [];
+  const re = /L([a-zA-Z][a-zA-Z0-9_$/]{2,}\/[a-zA-Z0-9_$/\/]+);/g;
+  let m;
+  const seen = new Set();
+  while ((m = re.exec(text)) && classNames.length < 200) {
+    const cls = m[1].replace(/\//g, '.');
+    if (!seen.has(cls) && !cls.includes('$')) { seen.add(cls); classNames.push(cls); }
+  }
+
+  const packages = {};
+  classNames.forEach(c => {
+    const parts = c.split('.');
+    const pkg = parts.slice(0, -1).join('.');
+    if (!packages[pkg]) packages[pkg] = [];
+    packages[pkg].push(parts[parts.length-1]);
+  });
+
+  let html = `
+    <div class="dex-class" style="margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+        <div><div style="font-size:18px;font-weight:700;color:var(--accent);font-family:var(--mono)">${classesSize}</div><div style="font-size:9px;color:var(--muted)">CLASSES</div></div>
+        <div><div style="font-size:18px;font-weight:700;color:#b39ddb;font-family:var(--mono)">${methodsSize}</div><div style="font-size:9px;color:var(--muted)">METHODS</div></div>
+        <div><div style="font-size:18px;font-weight:700;color:#ffb74d;font-family:var(--mono)">${stringsSize}</div><div style="font-size:9px;color:var(--muted)">STRINGS</div></div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:8px">Magic: ${magic.trim()} · ${formatSize(bytes.length)}</div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px;font-weight:600">PACKAGES TERDETEKSI (${Object.keys(packages).length})</div>`;
+
+  Object.entries(packages).slice(0,80).forEach(([pkg, classes]) => {
+    html += `<div class="dex-class">
+      <div class="dex-class-name">📦 ${pkg}</div>
+      ${classes.map(c => `<div class="dex-method">⚙️ ${c}</div>`).join('')}
+    </div>`;
+  });
+
+  if (Object.keys(packages).length > 80) html += `<div style="font-size:10px;color:var(--muted);padding:8px">...dan ${Object.keys(packages).length - 80} package lainnya</div>`;
+
+  document.getElementById('modalPreview').innerHTML = html;
+}
+
+// ─── RENDER HEX ──────────────────────────────────────────────────────────────
+function renderHex(bytes) {
+  const limit = Math.min(bytes.length, 2048);
+  let out = '';
+  for (let i = 0; i < limit; i += 16) {
+    const row = bytes.slice(i, i+16);
+    const addr = i.toString(16).padStart(6,'0');
+    const hex = Array.from(row).map(b => b.toString(16).padStart(2,'0')).join(' ').padEnd(47);
+    const ascii = Array.from(row).map(b => (b >= 32 && b < 127) ? String.fromCharCode(b) : '.').join('');
+    out += `<span style="color:var(--muted)">${addr}</span>  <span style="color:var(--accent)">${hex}</span>  <span style="color:#a5d6a7">${ascii}</span>\n`;
+  }
+  if (bytes.length > 2048) out += `\n<span style="color:var(--muted)">... ${formatSize(bytes.length - 2048)} lebih tidak ditampilkan</span>`;
+  document.getElementById('modalHex').innerHTML = `<div class="hex-view">${out}</div>`;
+}
+
+// Tutup modal dengan tombol back/swipe
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function filterFiles() {
+  const q = document.getElementById('fileSearch').value.toLowerCase();
+  document.querySelectorAll('#fileTree .tree-item').forEach(el => {
+    el.style.display = el.dataset.path.includes(q) ? '' : 'none';
+  });
+}
+
+function renderManifest(xml) {
+  const colored = xml
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/(&lt;\/?[\w:.]+)/g, '<span class="xml-tag">$1</span>')
+    .replace(/(\w+:\w+)=/g, '<span class="xml-attr">$1</span>=')
+    .replace(/"([^"]*)"/g, '"<span class="xml-val">$1</span>"')
+    .replace(/(&lt;!--.*?--&gt;)/gs, '<span class="xml-comment">$1</span>');
+  document.getElementById('manifestView').innerHTML = colored;
+}
+
+function renderStrings(obj) {
+  allStrings = Object.entries(obj);
+  document.getElementById('stringsList').innerHTML = allStrings.length === 0
+    ? '<div style="color:var(--muted);font-size:12px;padding:16px;text-align:center">Tidak ada strings.xml ditemukan atau file terenkripsi</div>'
+    : allStrings.map(([k,v]) => `<div class="str-item" data-key="${k.toLowerCase()}" data-val="${v.toLowerCase()}"><div class="str-key">${k}</div><div class="str-val">${v}</div></div>`).join('');
+}
+
+function filterStrings() {
+  const q = document.getElementById('strSearch').value.toLowerCase();
+  document.querySelectorAll('#stringsList .str-item').forEach(el => {
+    el.style.display = (el.dataset.key.includes(q) || el.dataset.val.includes(q)) ? '' : 'none';
+  });
+}
+
+function renderSecurity(info, permissions, manifest) {
+  const checks = [];
+  let score = 100;
+
+  if (info.debuggable === 'true') { checks.push({icon:'🔓',label:'Debuggable Aktif',desc:'App bisa di-debug oleh siapapun — berbahaya untuk produksi',level:'danger'}); score -= 20; }
+  else checks.push({icon:'✅',label:'Debuggable Nonaktif',desc:'App tidak bisa di-debug oleh pihak luar',level:'ok'});
+
+  if (info.allowBackup === 'true' || info.allowBackup === '—') { checks.push({icon:'⚠️',label:'Backup Diizinkan',desc:'Data app bisa dicadangkan via ADB oleh siapapun',level:'warn'}); score -= 10; }
+  else checks.push({icon:'✅',label:'Backup Dinonaktifkan',desc:'Data app terlindungi dari backup tidak sah',level:'ok'});
+
+  if (info.cleartext === 'true') { checks.push({icon:'🌐',label:'HTTP Plaintext Diizinkan',desc:'Traffic HTTP tidak terenkripsi diperbolehkan — risiko man-in-the-middle',level:'danger'}); score -= 15; }
+  else checks.push({icon:'✅',label:'Cleartext HTTP Diblokir',desc:'Semua traffic wajib HTTPS',level:'ok'});
+
+  if (!info.networkSecurity) { checks.push({icon:'⚠️',label:'Tidak Ada Network Security Config',desc:'Tidak ada konfigurasi keamanan jaringan kustom',level:'warn'}); score -= 5; }
+  else checks.push({icon:'✅',label:'Network Security Config Ada',desc:'Konfigurasi keamanan jaringan terdeteksi',level:'ok'});
+
+  const dangerPerms = permissions.filter(p => permLevel(p) === 'danger');
+  if (dangerPerms.length > 5) { checks.push({icon:'🚨',label:`${dangerPerms.length} Permission Berbahaya`,desc:'Jumlah izin berisiko tinggi sangat banyak',level:'danger'}); score -= 20; }
+  else if (dangerPerms.length > 0) { checks.push({icon:'⚠️',label:`${dangerPerms.length} Permission Berisiko`,desc:dangerPerms.map(p=>p.split('.').pop()).join(', '),level:'warn'}); score -= dangerPerms.length * 3; }
+  else checks.push({icon:'✅',label:'Tidak Ada Permission Berbahaya',desc:'Tidak ada izin berisiko tinggi',level:'ok'});
+
+  if (manifest.includes('exported="true"')) { checks.push({icon:'⚠️',label:'Komponen Exported Ditemukan',desc:'Ada komponen yang dapat diakses app lain',level:'warn'}); score -= 5; }
+
+  if (permissions.some(p => p.includes('INSTALL_PACKAGES'))) { checks.push({icon:'🚨',label:'Bisa Install APK Lain',desc:'App meminta izin menginstall aplikasi — sangat berisiko',level:'danger'}); score -= 15; }
+  if (permissions.some(p => p.includes('BIND_DEVICE_ADMIN'))) { checks.push({icon:'🚨',label:'Akses Device Admin',desc:'App meminta hak administrator perangkat',level:'danger'}); score -= 20; }
+  if (permissions.some(p => p.includes('SYSTEM_ALERT_WINDOW'))) { checks.push({icon:'⚠️',label:'Overlay Window',desc:'App bisa tampil di atas semua aplikasi lain',level:'warn'}); score -= 10; }
+
+  score = Math.max(0, Math.min(100, score));
+  const ring = document.getElementById('scoreRing');
+  const color = score >= 70 ? '#69ff47' : score >= 40 ? '#ffb74d' : '#ff5252';
+  ring.style.borderColor = color;
+  ring.style.color = color;
+  document.getElementById('scoreNum').textContent = score;
+
+  document.getElementById('securityList').innerHTML = checks.map(c =>
+    `<div class="sec-item">
+      <span class="sec-icon">${c.icon}</span>
+      <div>
+        <div class="sec-label" style="color:${c.level==='danger'?'var(--warn)':c.level==='warn'?'#ffb74d':'var(--ok)'}">${c.label}</div>
+        <div class="sec-desc">${c.desc}</div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
